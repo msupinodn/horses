@@ -28,9 +28,24 @@
   .temp-display .deg { font-size: 1.1rem; font-weight: 700; color: #60a5fa; }
   .loading { color: #64748b; font-size: 0.8rem; }
   .error { color: #f87171; font-size: 0.8rem; }
+
+  .forecast { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; max-width: 420px; width: 100%; margin-top: 16px; }
+  .forecast h2 { font-size: 1.1rem; margin-bottom: 16px; text-align: center; }
+  .forecast-grid { display: flex; flex-direction: column; gap: 8px; }
+  .forecast-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 10px; background: #0f172a; border: 1px solid #334155; font-size: 0.82rem; }
+  .forecast-day { font-weight: 600; min-width: 70px; }
+  .forecast-temps { display: flex; gap: 10px; align-items: center; }
+  .forecast-temps .hi { color: #f87171; font-weight: 600; }
+  .forecast-temps .lo { color: #60a5fa; font-weight: 600; }
+  .forecast-icon { font-size: 1.2rem; min-width: 28px; text-align: center; }
+  .forecast-blanket { font-size: 0.72rem; padding: 3px 8px; border-radius: 6px; font-weight: 600; white-space: nowrap; }
+  .blanket-yes { background: #422006; color: #fbbf24; border: 1px solid #92400e; }
+  .blanket-no { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+  .wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 420px; }
 </style>
 </head>
 <body>
+<div class="wrapper">
 <div class="card">
   <div class="horse">🐴</div>
   <h1>האם הסוס צריך קובן הלילה?</h1>
@@ -51,16 +66,39 @@
   <div class="result" id="result"></div>
 </div>
 
+<div class="forecast" id="forecast">
+  <h2>תחזית ל-7 ימים הקרובים</h2>
+  <div class="forecast-grid" id="forecast-grid">
+    <span class="loading">ענה על השאלה למעלה כדי לראות תחזית</span>
+  </div>
+</div>
+</div>
+
 <script>
 const LAT = 32.18, LON = 34.88;
 let minTemp = null;
 let minTime = null;
 let currentTemp = null;
+let cachedDaily = null;
+let cachedHourlyTimes = null;
+let cachedHourlyTemps = null;
+let isClipped = null;
+
+const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const WEATHER_ICONS = {
+  0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️',
+  45: '🌫️', 48: '🌫️',
+  51: '🌦️', 53: '🌦️', 55: '🌧️',
+  61: '🌧️', 63: '🌧️', 65: '🌧️',
+  71: '🌨️', 73: '🌨️', 75: '🌨️',
+  80: '🌦️', 81: '🌧️', 82: '🌧️',
+  95: '⛈️', 96: '⛈️', 99: '⛈️',
+};
 
 async function fetchForecast() {
   const display = document.getElementById('temp-display');
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m&current_weather=true&timezone=Asia/Jerusalem&forecast_days=2`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min,weathercode&current_weather=true&timezone=Asia/Jerusalem&forecast_days=8`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -69,7 +107,6 @@ async function fetchForecast() {
     const temps = data.hourly.temperature_2m;
 
     const now = new Date();
-    // Target: 07:00 tomorrow morning
     const tomorrow7am = new Date(now);
     tomorrow7am.setDate(tomorrow7am.getDate() + 1);
     tomorrow7am.setHours(7, 0, 0, 0);
@@ -94,14 +131,75 @@ async function fetchForecast() {
     display.innerHTML =
       `כרגע: <span class="deg">${currentTemp}°C</span><br>` +
       `מינימום עד 07:00: <span class="deg">${minTemp}°C</span> (בשעה ${minTime})`;
+
+    cachedDaily = data.daily;
+    cachedHourlyTimes = times;
+    cachedHourlyTemps = temps;
+
   } catch (e) {
     display.innerHTML = '<span class="error">שגיאה בקבלת מזג האוויר. נסה לרענן.</span>';
   }
 }
 
+function overnightMin(dayDateStr, hourlyTimes, hourlyTemps) {
+  const eveningStart = new Date(dayDateStr + 'T18:00:00');
+  const morningEnd = new Date(eveningStart);
+  morningEnd.setDate(morningEnd.getDate() + 1);
+  morningEnd.setHours(7, 0, 0, 0);
+
+  let lo = Infinity;
+  for (let i = 0; i < hourlyTimes.length; i++) {
+    const t = new Date(hourlyTimes[i]);
+    if (t >= eveningStart && t <= morningEnd) {
+      if (hourlyTemps[i] < lo) lo = hourlyTemps[i];
+    }
+  }
+  return lo === Infinity ? null : lo;
+}
+
+function renderWeeklyForecast() {
+  if (!cachedDaily || isClipped === null) return;
+  const grid = document.getElementById('forecast-grid');
+  const dates = cachedDaily.time;
+  const maxTemps = cachedDaily.temperature_2m_max;
+  const minTemps = cachedDaily.temperature_2m_min;
+  const codes = cachedDaily.weathercode;
+  const threshold = isClipped ? 15 : 10;
+
+  let html = '';
+  for (let i = 1; i < dates.length - 1; i++) {
+    const d = new Date(dates[i] + 'T00:00:00');
+    const dayName = 'ליל ' + DAY_NAMES[d.getDay()];
+    const icon = WEATHER_ICONS[codes[i]] || '🌡️';
+    const hi = maxTemps[i];
+    const nightLo = overnightMin(dates[i], cachedHourlyTimes, cachedHourlyTemps);
+    const lo = nightLo !== null ? nightLo : minTemps[i];
+
+    const needsBlanket = lo < threshold;
+    const blanketHtml = needsBlanket
+      ? '<span class="forecast-blanket blanket-yes">צריך קובן</span>'
+      : '<span class="forecast-blanket blanket-no">בלי קובן</span>';
+
+    html += `
+      <div class="forecast-row">
+        <span class="forecast-day">${dayName}</span>
+        <span class="forecast-icon">${icon}</span>
+        <span class="forecast-temps">
+          <span class="lo">${lo}°</span>
+          <span style="color:#64748b">/</span>
+          <span class="hi">${hi}°</span>
+        </span>
+        ${blanketHtml}
+      </div>`;
+  }
+  grid.innerHTML = html;
+}
+
 function answer(clipped) {
   document.getElementById('btn-yes').classList.toggle('selected', clipped);
   document.getElementById('btn-no').classList.toggle('selected', !clipped);
+  isClipped = clipped;
+  renderWeeklyForecast();
 
   if (minTemp === null || minTemp === Infinity) return;
 
