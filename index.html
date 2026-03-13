@@ -109,13 +109,13 @@ function answer(clipped) {
   const needsBlanket = minTemp < threshold;
   const el = document.getElementById('result');
 
-  const type = clipped ? 'גזוז' : 'לא גזוז';
+  const type = clipped ? 'מגולח' : 'לא מגולח';
 
   if (needsBlanket) {
     el.className = 'result yes';
     el.innerHTML =
       `<div class="icon">🧣</div>` +
-      `<div class="answer">כן, צריך שמיכה!</div>` +
+      `<div class="answer">כן, צריך קובן!</div>` +
       `<div class="details">` +
         `מינימום הלילה: ${minTemp}°C (בשעה ${minTime})<br>` +
         `סף ל${type}: מתחת ל-${threshold}°C` +
@@ -124,7 +124,7 @@ function answer(clipped) {
     el.className = 'result no';
     el.innerHTML =
       `<div class="icon">✨</div>` +
-      `<div class="answer">לא צריך שמיכה</div>` +
+      `<div class="answer">לא צריך קובן</div>` +
       `<div class="details">` +
         `מינימום הלילה: ${minTemp}°C (בשעה ${minTime})<br>` +
         `סף ל${type}: מתחת ל-${threshold}°C` +
