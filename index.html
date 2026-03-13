@@ -32,13 +32,12 @@
   .forecast { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; max-width: 420px; width: 100%; margin-top: 16px; }
   .forecast h2 { font-size: 1.1rem; margin-bottom: 16px; text-align: center; }
   .forecast-grid { display: flex; flex-direction: column; gap: 8px; }
-  .forecast-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 10px; background: #0f172a; border: 1px solid #334155; font-size: 0.82rem; }
-  .forecast-day { font-weight: 600; min-width: 70px; }
-  .forecast-temps { display: flex; gap: 10px; align-items: center; }
-  .forecast-temps .hi { color: #f87171; font-weight: 600; }
+  .forecast-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 10px 14px; border-radius: 10px; background: #0f172a; border: 1px solid #334155; font-size: 0.82rem; }
+  .forecast-day { font-weight: 600; flex: 1 1 60px; min-width: 60px; }
+  .forecast-temps { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
   .forecast-temps .lo { color: #60a5fa; font-weight: 600; }
-  .forecast-icon { font-size: 1.2rem; min-width: 28px; text-align: center; }
-  .forecast-blanket { font-size: 0.72rem; padding: 3px 8px; border-radius: 6px; font-weight: 600; white-space: nowrap; }
+  .forecast-icon { font-size: 1.2rem; flex-shrink: 0; min-width: 24px; text-align: center; }
+  .forecast-blanket { font-size: 0.72rem; padding: 3px 8px; border-radius: 6px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
   .blanket-yes { background: #422006; color: #fbbf24; border: 1px solid #92400e; }
   .blanket-no { background: #052e16; color: #4ade80; border: 1px solid #166534; }
   .wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 420px; }
@@ -171,7 +170,6 @@ function renderWeeklyForecast() {
     const d = new Date(dates[i] + 'T00:00:00');
     const dayName = 'ליל ' + DAY_NAMES[d.getDay()];
     const icon = WEATHER_ICONS[codes[i]] || '🌡️';
-    const hi = maxTemps[i];
     const nightLo = overnightMin(dates[i], cachedHourlyTimes, cachedHourlyTemps);
     const lo = nightLo !== null ? nightLo : minTemps[i];
 
@@ -186,8 +184,6 @@ function renderWeeklyForecast() {
         <span class="forecast-icon">${icon}</span>
         <span class="forecast-temps">
           <span class="lo">${lo}°</span>
-          <span style="color:#64748b">/</span>
-          <span class="hi">${hi}°</span>
         </span>
         ${blanketHtml}
       </div>`;
