@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>האם הסוס צריך שמיכה?</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 32px; max-width: 420px; width: 100%; text-align: center; }
+  h1 { font-size: 1.4rem; margin-bottom: 6px; }
+  .sub { font-size: 0.75rem; color: #64748b; margin-bottom: 28px; }
+  .horse { font-size: 4rem; margin-bottom: 20px; }
+  .question { font-size: 0.95rem; margin-bottom: 16px; color: #cbd5e1; }
+  .buttons { display: flex; gap: 12px; justify-content: center; margin-bottom: 24px; }
+  .btn { padding: 10px 28px; border: 2px solid #334155; border-radius: 10px; background: #0f172a; color: #e2e8f0; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .btn:hover { border-color: #60a5fa; color: #60a5fa; }
+  .btn.selected { border-color: #3b82f6; background: #1e3a5f; color: #60a5fa; }
+  .result { display: none; margin-top: 20px; padding: 20px; border-radius: 12px; }
+  .result.yes { background: #422006; border: 1px solid #92400e; }
+  .result.no { background: #052e16; border: 1px solid #166534; }
+  .result .icon { font-size: 3rem; margin-bottom: 8px; }
+  .result .answer { font-size: 1.2rem; font-weight: 700; margin-bottom: 6px; }
+  .result.yes .answer { color: #fbbf24; }
+  .result.no .answer { color: #4ade80; }
+  .result .details { font-size: 0.8rem; color: #94a3b8; line-height: 1.8; }
+  .temp-display { font-size: 0.85rem; color: #94a3b8; margin-bottom: 20px; min-height: 24px; line-height: 1.8; }
+  .temp-display .deg { font-size: 1.1rem; font-weight: 700; color: #60a5fa; }
+  .loading { color: #64748b; font-size: 0.8rem; }
+  .error { color: #f87171; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="horse">🐴</div>
+  <h1>האם הסוס צריך שמיכה הלילה?</h1>
+  <div class="sub">שדה ורבורג</div>
+
+  <div class="temp-display" id="temp-display">
+    <span class="loading">בודק תחזית...</span>
+  </div>
+
+  <div id="question-section">
+    <div class="question">האם הסוס גזוז?</div>
+    <div class="buttons">
+      <button class="btn" id="btn-yes" onclick="answer(true)">כן, גזוז</button>
+      <button class="btn" id="btn-no" onclick="answer(false)">לא</button>
+    </div>
+  </div>
+
+  <div class="result" id="result"></div>
+</div>
+
+<script>
+const LAT = 32.18, LON = 34.88;
+let minTemp = null;
+let minTime = null;
+let currentTemp = null;
+
+async function fetchForecast() {
+  const display = document.getElementById('temp-display');
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m&current_weather=true&timezone=Asia/Jerusalem&forecast_days=2`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    currentTemp = data.current_weather.temperature;
+    const times = data.hourly.time;
+    const temps = data.hourly.temperature_2m;
+
+    const now = new Date();
+    // Target: 07:00 tomorrow morning
+    const tomorrow7am = new Date(now);
+    tomorrow7am.setDate(tomorrow7am.getDate() + 1);
+    tomorrow7am.setHours(7, 0, 0, 0);
+
+    minTemp = Infinity;
+    minTime = '';
+    for (let i = 0; i < times.length; i++) {
+      const t = new Date(times[i]);
+      if (t >= now && t <= tomorrow7am) {
+        if (temps[i] < minTemp) {
+          minTemp = temps[i];
+          minTime = times[i].slice(11, 16);
+        }
+      }
+    }
+
+    if (minTemp === Infinity) {
+      display.innerHTML = '<span class="error">אין נתוני תחזית זמינים</span>';
+      return;
+    }
+
+    display.innerHTML =
+      `כרגע: <span class="deg">${currentTemp}°C</span><br>` +
+      `מינימום עד 07:00: <span class="deg">${minTemp}°C</span> (בשעה ${minTime})`;
+  } catch (e) {
+    display.innerHTML = '<span class="error">שגיאה בקבלת מזג האוויר. נסה לרענן.</span>';
+  }
+}
+
+function answer(clipped) {
+  document.getElementById('btn-yes').classList.toggle('selected', clipped);
+  document.getElementById('btn-no').classList.toggle('selected', !clipped);
+
+  if (minTemp === null || minTemp === Infinity) return;
+
+  const threshold = clipped ? 15 : 10;
+  const needsBlanket = minTemp < threshold;
+  const el = document.getElementById('result');
+
+  const type = clipped ? 'גזוז' : 'לא גזוז';
+
+  if (needsBlanket) {
+    el.className = 'result yes';
+    el.innerHTML =
+      `<div class="icon">🧣</div>` +
+      `<div class="answer">כן, צריך שמיכה!</div>` +
+      `<div class="details">` +
+        `מינימום הלילה: ${minTemp}°C (בשעה ${minTime})<br>` +
+        `סף ל${type}: מתחת ל-${threshold}°C` +
+      `</div>`;
+  } else {
+    el.className = 'result no';
+    el.innerHTML =
+      `<div class="icon">✨</div>` +
+      `<div class="answer">לא צריך שמיכה</div>` +
+      `<div class="details">` +
+        `מינימום הלילה: ${minTemp}°C (בשעה ${minTime})<br>` +
+        `סף ל${type}: מתחת ל-${threshold}°C` +
+      `</div>`;
+  }
+  el.style.display = 'block';
+}
+
+fetchForecast();
+</script>
+</body>
+</html>
